@@ -1,5 +1,6 @@
 #coding:utf-8
 from . import db
+from sqlalchemy.orm.collections import InstrumentedList
 
 class User(db.Model):
 	__tablename__ = "users"
@@ -22,7 +23,7 @@ class Article(db.Model):
 	summary = db.Column(db.Text)
 	create_time = db.Column(db.Integer)
 	update_time = db.Column(db.Integer)
-	tag = db.relationship("Tag", secondary=article_tag_map, lazy="subquery",
+	tags = db.relationship("Tag", secondary=article_tag_map, lazy="subquery",
 		backref=db.backref("articles", lazy=True))
 
 	def __repr__(self):
@@ -34,8 +35,27 @@ class Article(db.Model):
 			"id": self.id,
 			"title": self.title,
 			"create_time": self.create_time,
-			"summary": self.summary
+			"summary": self.summary,
 		}
+
+	def verbose(self, verbose_level):
+		level = int(verbose_level)
+		verbose_map = {'id': 10, 
+			'title': 20, 
+			'create_time': 30, 
+			'summary': 40, 
+			'update_time': 50,
+			'tags': 100}
+		result = {}
+		for k,v in verbose_map.items():
+			if v <= level:
+				col_vals = getattr(self, k)
+				if isinstance(col_vals, InstrumentedList):
+					result[k] = [col_val.serialize for col_val in col_vals]
+				else:
+					result[k] = col_vals
+		return result
+
 
 class Tag(db.Model):
 	__tablename__ = "tags"
@@ -54,6 +74,22 @@ class Tag(db.Model):
 			"name": self.name,
 			"create_time": self.create_time
 		}
+	def verbose(self, verbose_level):
+		level = int(verbose_level)
+		verbose_map = {'id': 10, 
+			'name': 20, 
+			'create_time': 30, 
+			'update_time': 40, 
+			'articles': 100}
+		result = {}
+		for k,v in verbose_map.items():
+			if v <= level:
+				col_vals = getattr(self, k)
+				if isinstance(col_vals, InstrumentedList):
+					result[k] = [col_val.serialize for col_val in col_vals]
+				else:
+					result[k] = col_vals
+		return result
 
 # class Binding(db.Model):
 # 	__tablename__ = "bindings"

@@ -89,6 +89,7 @@ def get_articles():
 	title = request.args.get("title", "")
 	skip = request.args.get("cursor", 0)
 	limit = request.args.get("limit", 10)
+	verbose = request.args.get("verbose", 10)
 	query = Article.query.order_by(desc(Article.create_time))
 	if title != "":
 		query = Article.query.filter(Article.title.like("%"+title+"%"))
@@ -98,7 +99,7 @@ def get_articles():
 		"total": total,
 		"limit": limit,
 		"cursor": skip,
-		"result": [article.serialize for article in articles]
+		"result": [article.verbose(verbose) for article in articles]
 		})
 
 def create_article():
@@ -114,12 +115,12 @@ def create_article():
 	for tag_id in tags:
 		tag = Tag.query.get(tag_id)
 		if tag:
-			article.tag.append(tag)
+			article.tags.append(tag)
 	db.session.add(article)
 	db.session.commit()
 	return jsonify({'result': article.serialize})
 
-@app.route("/api/articles/<int:article_id>", methods=["GET", "DELETE"])
+@app.route("/api/articles/<int:article_id>", methods=["GET", "DELETE", "PUT"])
 @tokenAuth
 def handle_article(article_id):
 	article = Article.query.get(article_id)
@@ -132,7 +133,29 @@ def handle_article(article_id):
 		return read_article(article)
 	elif request.method == "DELETE":
 		return delete_article(article)
+	elif request.method == "PUT":
+		return update_article(article)
 	
+def update_article(article):
+	# title = request.json.get("title")
+	summary = request.json.get("summary")
+	if not summary:
+		return jsonify({'error': 'param_error', 'message': 'request param error'})
+	article.summary = summary
+	tags = request.json.get('tags')
+	
+	now = int(time.time())
+	# article = Article(title=title, summary=summary, create_time=now, update_time=now)
+	tag_list = []
+	for tag_id in tags:
+		tag = Tag.query.get(tag_id)
+		if tag:
+			tag_list.append(tag)
+			# article.tags.append(tag)
+	article.tags = tag_list
+	# db.session.add(article)
+	db.session.commit()
+	return jsonify({'result': article.serialize})
 
 def read_article(article):
 	b64_name = base64.b64encode(article.title.encode("utf-8"))
@@ -162,16 +185,23 @@ def get_tags():
 	name = request.args.get("name", "")
 	skip = request.args.get("cursor", 0)
 	limit = request.args.get("limit", 10)
+	verbose = request.args.get("verbose", 10)
 	query = Tag.query
 	if name != "":
 		query = Tag.query.filter(Tag.name.like("%"+name+"%"))
 	total = query.count()
-	tags = query.offset(skip).limit(limit).all()
+	if int(limit) == 0:
+		tags = query.offset(skip).all() 
+	else:
+		tags = query.offset(skip).limit(limit).all()
+	print 'tags--------',tags
+	for tt in tags:
+		print tt.serialize,
 	return jsonify({
 		"total": total,
 		"limit": limit,
 		"cursor": skip,
-		"result": [tag.serialize for tag in tags]
+		"result": [t.verbose(verbose) for t in tags]
 		})
 
 def create_tag():
