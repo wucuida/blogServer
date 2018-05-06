@@ -71,7 +71,7 @@ def upload_file():
 	article_file = request.files["file"]
 	article_root = app.config["FILE_ROOT_PATH"]
 	b64_title = base64.b64encode(title.encode('utf-8'))
-	print b64_title, "b64_title"
+	# print b64_title, "b64_title"
 	article_name = secure_filename(b64_title + ".md")
 	file_path = os.path.join(article_root, article_name)
 	article_file.save(file_path)
@@ -90,9 +90,18 @@ def get_articles():
 	skip = request.args.get("cursor", 0)
 	limit = request.args.get("limit", 10)
 	verbose = request.args.get("verbose", 10)
+	start_time = request.args.get("startTime", 0)
+	end_time = request.args.get("endTime", 0)
 	query = Article.query.order_by(desc(Article.create_time))
+	if start_time and end_time:
+		if end_time > start_time:
+			query = query.filter(Article.create_time >= start_time)\
+				.filter(Article.create_time <= end_time)
+		else:
+			return jsonify({'error': 'param_error', 
+				'message': 'request param (startTime and endTime) invalid'})
 	if title != "":
-		query = Article.query.filter(Article.title.like("%"+title+"%"))
+		query = query.filter(Article.title.like("%"+title+"%"))
 	total = query.count()
 	articles = query.offset(skip).limit(limit).all()
 	return jsonify({
@@ -111,6 +120,8 @@ def create_article():
 	if Article.query.filter_by(title=title).first():
 		return jsonify({'error': 'resouce existed', "message": 'article title is existed'})
 	now = int(time.time())
+	# import random
+	# now = 1520956800-random.randint(10000, 20000)
 	article = Article(title=title, summary=summary, create_time=now, update_time=now)
 	for tag_id in tags:
 		tag = Tag.query.get(tag_id)
@@ -135,6 +146,7 @@ def handle_article(article_id):
 		return delete_article(article)
 	elif request.method == "PUT":
 		return update_article(article)
+
 	
 def update_article(article):
 	# title = request.json.get("title")
