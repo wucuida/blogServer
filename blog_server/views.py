@@ -23,11 +23,11 @@ def tokenAuth(fn):
 	def decorator(*args, **kw):
 		if request.method == "GET":
 			return fn(*args, **kw)
-		if request.headers.get("access_token"):
+		if request.headers.get("Access-Token"):
 			s = Serializer(secret_key=app.config["SECRET_KEY"],
 				salt=app.config["AUTH_SALT"])
 			try:
-				data = s.loads(request.headers.get("access_token", ""))
+				data = s.loads(request.headers.get("Access-Token", ""))
 			except SignatureExpired:
 				return jsonify({'error': 'token_expired', "message": 'token is expired'})
 			except BadSignature,e:
@@ -41,7 +41,7 @@ def tokenAuth(fn):
 			else:
 				return jsonify({"error": "token_error", "message": 'token is invalid'})
 		else:
-			return jsonify({'error': 'not_login', 'message': 'miss access_token'})
+			return jsonify({'error': 'not_login', 'message': 'miss Access-Token'})
 	return decorator
 
 @app.route("/api/auth", methods=["POST"])
