@@ -1,6 +1,8 @@
 #coding:utf-8
-from . import db
+from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy.orm.collections import InstrumentedList
+
+db = SQLAlchemy()
 
 class User(db.Model):
 	__tablename__ = "users"

@@ -1,15 +1,13 @@
 #coding: utf-8
 import os
-from datetime import datetime
 import time
 import base64
 from functools import wraps
-from .models import User, Article, Tag
-from . import app
-from . import db
+from datetime import datetime
 from flask import jsonify
 from flask import request
 from flask import g
+from flask import current_app
 from sqlalchemy import desc
 from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
 from itsdangerous import SignatureExpired
@@ -17,6 +15,9 @@ from itsdangerous import BadSignature
 from werkzeug.security import generate_password_hash
 from werkzeug.security import check_password_hash
 from werkzeug import secure_filename
+from .models import User, Article, Tag
+from . import api
+from .models import db
 
 def tokenAuth(fn):
 	@wraps(fn)
@@ -24,8 +25,8 @@ def tokenAuth(fn):
 		if request.method == "GET":
 			return fn(*args, **kw)
 		if request.headers.get("Access-Token"):
-			s = Serializer(secret_key=app.config["SECRET_KEY"],
-				salt=app.config["AUTH_SALT"])
+			s = Serializer(secret_key=current_app.config["SECRET_KEY"],
+				salt=current_app.config["AUTH_SALT"])
 			try:
 				data = s.loads(request.headers.get("Access-Token", ""))
 			except SignatureExpired:
@@ -44,7 +45,11 @@ def tokenAuth(fn):
 			return jsonify({'error': 'not_login', 'message': 'miss Access-Token'})
 	return decorator
 
-@app.route("/api/auth", methods=["POST"])
+@api.before_request
+def before_request():
+	print request, "----"
+
+@api.route("/auth", methods=["POST"])
 def get_token():
 	name = request.json.get("name")
 	passwd = request.json.get("password")[:-3]
@@ -58,18 +63,18 @@ def get_token():
 	if today != passwd_day:
 		return jsonify({'error': 'passwd_format_error', 'message': 'password not match secret formmat'})
 	# 根据请求的name, passwd 查询user, c传递user_id, 保存到token中
-	s = Serializer(secret_key=app.config["SECRET_KEY"],
-		salt=app.config["AUTH_SALT"],
-		expires_in=app.config["TOKEN_EXPIRES_IN"])
+	s = Serializer(secret_key=current_app.config["SECRET_KEY"],
+		salt=current_app.config["AUTH_SALT"],
+		expires_in=current_app.config["TOKEN_EXPIRES_IN"])
 	token = s.dumps({"user_id": user.id})
 	return jsonify({'result': token})
 
-@app.route("/api/upload", methods=["POST"])
+@api.route("/upload", methods=["POST"])
 @tokenAuth
 def upload_file():
 	title = request.args["title"]
 	article_file = request.files["file"]
-	article_root = app.config["FILE_ROOT_PATH"]
+	article_root = current_app.config["FILE_ROOT_PATH"]
 	b64_title = base64.b64encode(title.encode('utf-8'))
 	# print b64_title, "b64_title"
 	article_name = secure_filename(b64_title + ".md")
@@ -77,7 +82,7 @@ def upload_file():
 	article_file.save(file_path)
 	return jsonify({'result': article_name})
 
-@app.route("/api/articles", methods=["GET", "POST"])
+@api.route("/articles", methods=["GET", "POST"])
 @tokenAuth
 def handle_articles():
 	if request.method == "GET":
@@ -131,7 +136,7 @@ def create_article():
 	db.session.commit()
 	return jsonify({'result': article.serialize})
 
-@app.route("/api/articles/<int:article_id>", methods=["GET", "DELETE", "PUT"])
+@api.route("/articles/<int:article_id>", methods=["GET", "DELETE", "PUT"])
 @tokenAuth
 def handle_article(article_id):
 	article = Article.query.get(article_id)
@@ -171,7 +176,7 @@ def update_article(article):
 
 def read_article(article):
 	b64_name = base64.b64encode(article.title.encode("utf-8"))
-	file_path = os.path.join(app.config["FILE_ROOT_PATH"], secure_filename(b64_name)+".md")
+	file_path = os.path.join(current_app.config["FILE_ROOT_PATH"], secure_filename(b64_name)+".md")
 	with open(file_path, "rb") as f:
 		content = f.read()
 	return jsonify({'result': content})
@@ -179,13 +184,13 @@ def read_article(article):
 def delete_article(article):
 	db.session.delete(article)
 	db.session.commit()
-	file_path = os.path.join(app.config["FILE_ROOT_PATH"], article.title+".md")
+	file_path = os.path.join(current_app.config["FILE_ROOT_PATH"], article.title+".md")
 	if os.path.exists(file_path):
 		os.remove(file_path)
 	return jsonify({'result': article.serialize})
 
 
-@app.route("/api/tags", methods=["GET", "POST"])
+@api.route("/tags", methods=["GET", "POST"])
 @tokenAuth
 def handle_tags():
 	if request.method == "GET":
@@ -206,7 +211,6 @@ def get_tags():
 		tags = query.offset(skip).all() 
 	else:
 		tags = query.offset(skip).limit(limit).all()
-	print 'tags--------',tags
 	for tt in tags:
 		print tt.serialize,
 	return jsonify({
@@ -224,7 +228,7 @@ def create_tag():
 	db.session.commit()
 	return jsonify({'result': tag.serialize})
 
-@app.route("/api/tags/<int:tag_id>", methods=['PUT', 'DELETE'])
+@api.route("/tags/<int:tag_id>", methods=['PUT', 'DELETE'])
 @tokenAuth
 def handle_tag(tag_id):
 	tag = Tag.query.get(tag_id)
@@ -252,7 +256,7 @@ def delete_tag(tag):
 	db.session.commit()
 	return jsonify({'result': tag.serialize})
 
-@app.route("/api/users", methods=["POST", "PUT"])
+@api.route("/users", methods=["POST", "PUT"])
 def create_user():
 	p = '593bbd2b2780acdcb9953862898efcb7'
 	hash_passwd = generate_password_hash(p, salt_length=12)

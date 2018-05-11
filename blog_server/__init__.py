@@ -1,22 +1,28 @@
 #coding: utf-8
 import os
-from flask import Flask
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask,request
+from .api.models import db
 
 
-app = Flask(__name__)
-app.config["FILE_ROOT_PATH"] = "F:/workspace/blogSite/src/articles"
-# app.config['FILE_ROOT_PATH'] = "D:/gitHub/blogSite/src/articles"
-app.config['SECRET_KEY'] = 'obj_id__5462cdf80ddf1a071485d85e_this_is_a_key_90'
-app.config['AUTH_SALT'] = "a_auth_salt_4_1_7"
-app.config["TOKEN_EXPIRES_IN"] = 30*60*10
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite'
-app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+def init_db(app):
+	# 模块同级目录下保存db文件
+	db_home = os.path.join(os.path.dirname(os.path.dirname(__file__)), "db")
+	if not os.path.exists(db_home):
+		os.makedirs(db_home)
+	db.init_app(app)
+	db_file = os.path.join(db_home, "db.sqlite")
+	if not os.path.exists(db_file):				
+		db.create_all()
 
-db = SQLAlchemy(app)
+def init_app(app):
+	from api import api
+	app.register_blueprint(api, url_prefix='/api')
 
-import views
+def create_app():
+	app = Flask(__name__, instance_relative_config=True)
+	app.config.from_object('blog_server.config.DefaultConfig')
+	app.config.from_pyfile("config.py")
+	init_db(app)
+	init_app(app)	
+	return app
 
-if not os.path.exists("db.sqlite"):
-	db.create_all()

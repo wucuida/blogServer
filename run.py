@@ -1,5 +1,10 @@
 #coding: utf-8
-from blog_server import app
+import os
+from blog_server import create_app
+
 
 if __name__ == "__main__":
-	app.run(threaded=True, debug=True)
+	# if not os.path.exists("db.sqlite"):
+	# db.create_all()
+	app = create_app()
+	app.run()
