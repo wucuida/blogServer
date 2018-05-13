@@ -19,6 +19,7 @@ from .models import User, Article, Tag
 from . import api
 from .models import db
 
+
 def tokenAuth(fn):
 	@wraps(fn)
 	def decorator(*args, **kw):
@@ -184,7 +185,8 @@ def read_article(article):
 def delete_article(article):
 	db.session.delete(article)
 	db.session.commit()
-	file_path = os.path.join(current_app.config["FILE_ROOT_PATH"], article.title+".md")
+	b64_name = base64.b64encode(article.title.encode("utf-8"))
+	file_path = os.path.join(current_app.config["FILE_ROOT_PATH"], secure_filename(b64_name)+".md")
 	if os.path.exists(file_path):
 		os.remove(file_path)
 	return jsonify({'result': article.serialize})
@@ -211,8 +213,6 @@ def get_tags():
 		tags = query.offset(skip).all() 
 	else:
 		tags = query.offset(skip).limit(limit).all()
-	for tt in tags:
-		print tt.serialize,
 	return jsonify({
 		"total": total,
 		"limit": limit,
